@@ -1,2 +1,2 @@
 all:
-	gcc -o fnptrs fnptrs.c
+	g++ fnptrs.cpp -o fnptrs
