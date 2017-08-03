@@ -110,7 +110,7 @@ struct sockinfo socket_setup() {
 
 
 struct sockinfo wrapped_accept(struct sockinfo sock) {
-	int fd = accept(sock.fd, NULL, NULL);
+	int fd = accept(sock.fd, nullptr, nullptr);
 	if(fd < 0) {
 		perror("accept() failed\n");
 	}
@@ -129,7 +129,7 @@ void *thread_init(void *arg) {
 
 	handle_client(conn);
 	
-	return NULL;
+	return nullptr;
 }
 
 
@@ -148,7 +148,7 @@ int main(int argc, char **argv) {
 		memcpy(heap_conn, &conn, sizeof(struct sockinfo));
 		
 		pthread_t tid;
-		int err = pthread_create(&tid, NULL, thread_init, heap_conn);
+		int err = pthread_create(&tid, nullptr, thread_init, heap_conn);
 		if(err != 0) {
 			// presumably max threads have been spawned
 			perror("pthread_create() failed\n");
