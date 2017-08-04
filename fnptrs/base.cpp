@@ -1,5 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <string.h>
 #include <unistd.h>
 #include <pthread.h>
 
@@ -41,13 +45,93 @@ int d(int a) {
 	return a * a;
 }
 
-// --- main ---------------------------------------------------
+// --- update daemon ------------------------------------------
+
+#define UDS_NAME "patch_uds"
+#define HEADER_LEN sizeof(size_t)
+#define QUEUE 1
 
 void *daemon(void *arg) {
-	while(1) {
-		usleep(100);
+
+	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if(fd < 0) {
+		perror("socket() failed\n");
+		_exit(1);
 	}
+	
+	struct sockaddr_un server;
+	server.sun_family = AF_UNIX;
+	unlink(UDS_NAME);				   // make sure UDS_NAME is available
+	strcpy(server.sun_path, UDS_NAME); // don't make UDS_NAME too long
+	
+	int err = bind(fd, (struct sockaddr *) &server, sizeof(struct sockaddr_un));
+	if(err < 0) {
+		perror("bind() failed\n");
+		_exit(1);
+	}
+	
+	err = listen(fd, QUEUE);
+	if(err < 0) {
+		perror("listen() failed\n");
+		_exit(1);
+	}
+	
+	while(1) {
+	
+		int conn = accept(fd, NULL, NULL);
+		if(conn < 0) {
+			perror("accept() failed\n");
+			continue;
+		}
+		
+		union {
+			char header[HEADER_LEN];
+			size_t len;
+		};
+		
+		int n = read(conn, header, HEADER_LEN);
+		if(n < HEADER_LEN) {
+			perror("header read() failed\n");
+			close(conn);
+			continue;
+		}
+		
+		if(n == HEADER_LEN) {
+			char *buf = (char *) malloc(len);
+			if(buf == NULL) {
+				perror("body buf malloc() failed\n");
+				close(conn);
+				continue;
+			}
+			
+			n = read(conn, buf, len);
+			if(n < len) {
+				perror("body read() failed\n");
+				free(buf);
+				close(conn);
+				continue;
+			}
+			
+			// asymmetric encryption magic might go here
+			
+			for(int i = 0; i < len; i++) {
+				printf("%x ", buf[i]);
+			}
+			
+			free(buf);
+		}
+		else {
+			perror("header read() failed\n");
+		}
+		
+		close(conn);
+	}
+	
+	close(fd);
+	unlink(UDS_NAME);
 }
+
+// --- main ---------------------------------------------------
 
 int main(int argc, char **argv) {
 	(void) argc;
@@ -57,7 +141,7 @@ int main(int argc, char **argv) {
 	int err = pthread_create(&tid, NULL, daemon, NULL);
 	
 	while(1) {
-		printf("%d\n", vt.a(1,2,3,4));
+		//printf("%d\n", vt.a(1,2,3,4));
 	}
 	
 	return 0;

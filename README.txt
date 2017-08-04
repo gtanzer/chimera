@@ -7,6 +7,12 @@ make
 
 Different versions of the same function are mixed in the same call stack, so output varies, but state seems to be kept consistent.
 
+make
+./base
+./patcher
+
+Currently, the patcher sends the .o file for the update over a UDS to the original program.
+
 // --- webserver --------------------------------------
 
 I've been testing with:
