@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/mman.h>
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
@@ -97,9 +98,17 @@ void *daemon(void *arg) {
 		}
 		
 		if(n == HEADER_LEN) {
-			char *buf = (char *) malloc(len);
+		
+			char *buf = (char *) mmap(
+										NULL,							// no preferred address
+										len,
+										PROT_READ | PROT_WRITE,
+										MAP_PRIVATE | MAP_ANONYMOUS,	// no file backing
+										-1,								// MAP_ANONYMOUS
+										0								// MAP_ANONYMOUS
+									 );
 			if(buf == NULL) {
-				perror("body buf malloc() failed\n");
+				perror("mmap() failed\n");
 				close(conn);
 				continue;
 			}
@@ -107,7 +116,7 @@ void *daemon(void *arg) {
 			n = read(conn, buf, len);
 			if(n < len) {
 				perror("body read() failed\n");
-				free(buf);
+				munmap(buf, len);
 				close(conn);
 				continue;
 			}
@@ -118,7 +127,7 @@ void *daemon(void *arg) {
 				printf("%x ", buf[i]);
 			}
 			
-			free(buf);
+			munmap(buf, len);
 		}
 		else {
 			perror("header read() failed\n");
