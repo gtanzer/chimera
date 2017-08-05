@@ -13,6 +13,9 @@ int b(int a, int b, int c);
 int c(int a, int b);
 int d(int a);
 
+int apply_patch(const char *buf, size_t len);
+void *daemon(void *arg);
+
 // --- vtable -------------------------------------------------
 
 struct vtable {
@@ -46,11 +49,30 @@ int d(int a) {
 	return a * a;
 }
 
+// --- main ---------------------------------------------------
+
+int main(int argc, char **argv) {
+	(void) argc;
+	(void) argv;
+	
+	pthread_t tid;
+	int err = pthread_create(&tid, NULL, daemon, NULL);
+	
+	while(1) {
+		printf("%d\n", vt.a(1,2,3,4));
+		sleep(1);
+	}
+	
+	return 0;
+}
+
 // --- update daemon ------------------------------------------
 
 #define UDS_NAME "patch_uds"
 #define HEADER_LEN sizeof(size_t)
 #define QUEUE 1
+
+int apply_patch(const char *buf, size_t len);
 
 void *daemon(void *arg) {
 
@@ -123,11 +145,13 @@ void *daemon(void *arg) {
 			
 			// asymmetric encryption magic might go here
 			
-			for(int i = 0; i < len; i++) {
-				printf("%x ", buf[i]);
+			err = apply_patch(buf, len);
+			if(err < 0) {
+				perror("apply_patch() failed\n");
+				munmap(buf, len);
+				close(conn);
+				continue;
 			}
-			
-			munmap(buf, len);
 		}
 		else {
 			perror("header read() failed\n");
@@ -140,18 +164,121 @@ void *daemon(void *arg) {
 	unlink(UDS_NAME);
 }
 
-// --- main ---------------------------------------------------
+// https://opensource.apple.com/source/cctools/cctools-795/include/mach-o/loader.h
 
-int main(int argc, char **argv) {
-	(void) argc;
-	(void) argv;
+#include <mach-o/loader.h>
+#include <mach-o/nlist.h>
+
+int apply_patch(const char *buf, size_t len) {
 	
-	pthread_t tid;
-	int err = pthread_create(&tid, NULL, daemon, NULL);
+	struct mach_header_64 *h = (struct mach_header_64 *) buf;
 	
-	while(1) {
-		//printf("%d\n", vt.a(1,2,3,4));
+	if(h->magic != MH_MAGIC_64) {
+		perror("Must be native-endian 64-bit Mach-O file\n");
+		return -1;
 	}
+	
+	if(h->filetype != MH_OBJECT) {
+		perror("Not a relocatable object file\n");
+		return -1;
+	}
+	
+	size_t offset = sizeof(struct mach_header_64);
+	
+	int err = mprotect((void *) buf, len, PROT_EXEC); // this should probably go later
+	if(err < 0) {
+		perror("mprotect() failed\n");
+		return -1;
+	}
+
+	uint64_t *fns = NULL;
+	int f = 0;
+	void *text_start = NULL;
+	
+	for(int i = 0; i < h->ncmds; i++) {
+		uint32_t *cmd = (uint32_t *) &buf[offset];
+		uint32_t cmdsize = cmd[1];
+		
+		switch(*cmd) {
+			case LC_SYMTAB: {
+				struct symtab_command *c = (struct symtab_command *) cmd;
+				
+				fns = (uint64_t *) malloc(sizeof(uint64_t) * c->nsyms);
+				if(fns == NULL) {
+					perror("fns malloc() failed\n");
+					return -1;
+				}
+				
+				size_t soffset = c->symoff;
+				for(int j = 0; j < c->nsyms; j++) {
+					struct nlist_64 *n = (struct nlist_64 *) &buf[soffset];
+					
+					if(n->n_sect == 1) {		// __text
+						fns[f] = n->n_value;
+						f++;
+					}
+					
+					soffset += sizeof(struct nlist_64);
+				}
+				
+				break;
+			}
+			case LC_DYSYMTAB:
+				break;
+			case LC_SEGMENT_64: {
+				struct segment_command_64 *c = (struct segment_command_64 *) cmd;
+			
+				size_t soffset = offset + sizeof(segment_command_64);
+				for(int j = 0; j < c->nsects; j++) {
+					struct section_64 *s = (struct section_64 *) &buf[soffset];
+					
+					if(strcmp(s->sectname, SECT_TEXT) == 0) {
+						text_start = (void *) &buf[s->offset];
+					}
+					
+					soffset += sizeof(struct section_64);
+				}
+				break;
+			}
+			default:
+				break;
+		}
+
+		offset += cmdsize;
+	}
+	
+	if(fns == NULL) {
+		perror("Broken symbol table\n");
+		return -1;
+	}
+	if(text_start == NULL) {
+		perror("Broken text segment\n");
+		free(fns);
+		return -1;
+	}
+	
+	printf("\nBefore:\n");
+	printf("vt.a: %p\n", vt.a);
+	printf("vt.b: %p\n", vt.b);
+	printf("vt.c: %p\n", vt.c);
+	printf("vt.d: %p\n", vt.d);
+	
+	for(int i = 0; i < f; i++) {			// fill the vtable without worrying about types
+		void **p = &((void **) &vt)[i];
+		*p = (void *) ((uintmax_t) text_start + (uintmax_t) fns[i]);
+	}
+	
+	printf("\nAfter:\n");
+	printf("vt.a: %p\n", vt.a);
+	printf("vt.b: %p\n", vt.b);
+	printf("vt.c: %p\n", vt.c);
+	printf("vt.d: %p\n", vt.d);
+	
+	free(fns);
+	
+	//mprotect((void *) buf, len, PROT_EXEC);
 	
 	return 0;
 }
+
+
