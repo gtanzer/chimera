@@ -3,6 +3,13 @@
 // --- fnptrs -----------------------------------------
 
 make
+./dlbase
+./dlpatcher
+
+The program correctly transitions to a new patch located in the current directory. It currently uses a somewhat-unideal virtual table hopping strategy; implementing the original version as a dll or properly massaging the compiler may fix this problem.
+
+
+make
 ./fnptrs
 
 Different versions of the same function are mixed in the same call stack, so output varies, but state seems to be kept consistent.

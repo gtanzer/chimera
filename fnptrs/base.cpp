@@ -8,10 +8,10 @@
 #include <unistd.h>
 #include <pthread.h>
 
-int a(int a, int b, int c, int d);
-int b(int a, int b, int c);
-int c(int a, int b);
-int d(int a);
+int a(int x, int y, int z, int w);
+int b(int x, int y, int z);
+int c(int x, int y);
+int d(int x);
 
 int apply_patch(const char *buf, size_t len);
 void *daemon(void *arg);
@@ -29,24 +29,24 @@ struct vtable vt = { &a, &b, &c, &d };
 
 // --- base versions ------------------------------------------
 
-int a(int a, int b, int c, int d) {
+int a(int x, int y, int z, int w) {
 	printf("a1 ");
-	return vt.b(a,b,c) + vt.b(b,c,d);
+	return vt.b(x,y,z) + vt.b(y,z,w);
 }
 
-int b(int a, int b, int c) {
+int b(int x, int y, int z) {
 	printf("b1 ");
-	return vt.c(a,b) + vt.c(b,c);
+	return vt.c(x,y) + vt.c(y,z);
 }
 
-int c(int a, int b) {
+int c(int x, int y) {
 	printf("c1 ");
-	return vt.d(a) + vt.d(b);
+	return vt.d(x) + vt.d(y);
 }
 
-int d(int a) {
+int d(int x) {
 	printf("d1 ");
-	return a * a;
+	return x * x;
 }
 
 // --- main ---------------------------------------------------
@@ -184,16 +184,10 @@ int apply_patch(const char *buf, size_t len) {
 	}
 	
 	size_t offset = sizeof(struct mach_header_64);
-	
-	int err = mprotect((void *) buf, len, PROT_EXEC); // this should probably go later
-	if(err < 0) {
-		perror("mprotect() failed\n");
-		return -1;
-	}
 
 	uint64_t *fns = NULL;
 	int f = 0;
-	void *text_start = NULL;
+	void *segment_start = NULL;
 	
 	for(int i = 0; i < h->ncmds; i++) {
 		uint32_t *cmd = (uint32_t *) &buf[offset];
@@ -233,7 +227,7 @@ int apply_patch(const char *buf, size_t len) {
 					struct section_64 *s = (struct section_64 *) &buf[soffset];
 					
 					if(strcmp(s->sectname, SECT_TEXT) == 0) {
-						text_start = (void *) &buf[s->offset];
+						segment_start = (void *) &buf[s->offset];
 					}
 					
 					soffset += sizeof(struct section_64);
@@ -251,8 +245,8 @@ int apply_patch(const char *buf, size_t len) {
 		perror("Broken symbol table\n");
 		return -1;
 	}
-	if(text_start == NULL) {
-		perror("Broken text segment\n");
+	if(segment_start == NULL) {
+		perror("Broken segment command\n");
 		free(fns);
 		return -1;
 	}
@@ -263,9 +257,16 @@ int apply_patch(const char *buf, size_t len) {
 	printf("vt.c: %p\n", vt.c);
 	printf("vt.d: %p\n", vt.d);
 	
-	for(int i = 0; i < f; i++) {			// fill the vtable without worrying about types
+	int err = mprotect((void *) buf, len, PROT_READ | PROT_EXEC);
+	if(err < 0) {
+		perror("mprotect() failed\n");
+		free(fns);
+		return -1;
+	}
+	
+	for(int i = 0; i < f; i++) {			// fill the old vtable without worrying about types
 		void **p = &((void **) &vt)[i];
-		*p = (void *) ((uintmax_t) text_start + (uintmax_t) fns[i]);
+		*p = (void *) ((uintmax_t) segment_start + (uintmax_t) fns[i]);
 	}
 	
 	printf("\nAfter:\n");

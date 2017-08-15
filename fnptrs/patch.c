@@ -1,7 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <pthread.h>
 
 int a(int x, int y, int z, int w);
 int b(int x, int y, int z);
@@ -19,7 +16,7 @@ struct vtable {
 	int (*d)(int);
 };
 
-extern struct vtable vt;
+struct vtable vt = { &a, &b, &c, &d };
 
 // --- alt versions -------------------------------------------
 
