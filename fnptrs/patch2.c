@@ -21,21 +21,21 @@ struct vtable vt = { &a, &b, &c, &d };
 // --- alt versions -------------------------------------------
 
 int a(int x, int y, int z, int w) {
-	printf("a1 ");
-	return vt.b(x,y,z) * vt.b(y,z,w);
+	printf("a2 ");
+	return vt.b(x,y,x) * vt.b(w,z,w);
 }
 
 int b(int x, int y, int z) {
-	printf("b1 ");
+	printf("b2 ");
 	return vt.c(x,y) * vt.c(y,z);
 }
 
 int c(int x, int y) {
-	printf("c1 ");
-	return vt.d(x) * vt.d(y);
+	printf("c2 ");
+	return vt.d(x) + vt.d(y);
 }
 
 int d(int x) {
-	printf("d1 ");
-	return x + x;
+	printf("d2 ");
+	return x * x;
 }

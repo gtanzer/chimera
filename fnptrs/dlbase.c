@@ -25,26 +25,27 @@ struct vtable {
 };
 
 struct vtable vt = { &a, &b, &c, &d };
+void **ovt = (void **) &vt;
 
 // --- base versions ------------------------------------------
 
 int a(int x, int y, int z, int w) {
-	printf("a1 ");
+	printf("a ");
 	return vt.b(x,y,z) + vt.b(y,z,w);
 }
 
 int b(int x, int y, int z) {
-	printf("b1 ");
+	printf("b ");
 	return vt.c(x,y) + vt.c(y,z);
 }
 
 int c(int x, int y) {
-	printf("c1 ");
+	printf("c ");
 	return vt.d(x) + vt.d(y);
 }
 
 int d(int x) {
-	printf("d1 ");
+	printf("d ");
 	return x * x;
 }
 
@@ -59,6 +60,7 @@ int main(int argc, char **argv) {
 	
 	while(1) {
 		printf("%d\n", vt.a(1,2,3,4));
+		sleep(1);
 	}
 	
 	return 0;
@@ -67,6 +69,7 @@ int main(int argc, char **argv) {
 // --- patch daemon -------------------------------------------
 
 #define UDS_NAME "patch_uds"
+#define HEADER_LEN sizeof(size_t)
 #define QUEUE 1
 
 int apply_patch(const char *name);
@@ -104,18 +107,42 @@ void *patch_daemon(void *arg) {
 			continue;
 		}
 		
-		int n = read(conn, NULL, 1);
-		if(n > 0) {
-			perror("ping read() failed\n");
+		union {
+			char buf[HEADER_LEN];
+			size_t len;
+		} header;
+		
+		int n = read(conn, header.buf, HEADER_LEN);
+		if(n < HEADER_LEN) {
+			perror("header read() failed\n");
 			close(conn);
 			continue;
 		}
 		
-		err = apply_patch("patch.dylib");
-		if(err < 0) {
-			perror("apply_patch() failed\n");
-			_exit(1);
+		if(n == HEADER_LEN) {
+			char *name = malloc(header.len);
+		
+			n = read(conn, name, header.len);
+			if(n < header.len) {
+				perror("body read() failed\n");
+				free(name);
+				close(conn);
+				continue;
+			}
+		
+			err = apply_patch(name);
+			if(err < 0) {
+				perror("apply_patch() failed\n");
+				_exit(1);
+			}
+			
+			free(name);
 		}
+		else {
+			perror("header read() failed\n");
+		}
+		
+		
 		
 		close(conn);
 	}
@@ -141,10 +168,13 @@ int apply_patch(const char *name) {
 		return -1;
 	}
 	
-	void **ovt = (void **) &vt;
+	printf("nvt: %p\novt: %p\n", nvt, ovt);
+	
 	for(int i = 0; i < N_FUNCS; i++) {			// fill the old vtable without worrying about types
 		ovt[i] = nvt[i];
 	}
+	
+	ovt = nvt;
 	
 	// we could keep dll somewhere
 	// and dlclose() if no stack frame

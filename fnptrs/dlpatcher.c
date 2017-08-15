@@ -30,11 +30,24 @@ int main(int argc, char **argv) {
 		_exit(1);
 	}
 	
-	char c = 1;
-	err = write(fd, (void *) &c, sizeof(char));
+	char *name;
+	if(argc == 2)
+		name = "patch2.dylib";
+	else
+		name = "patch.dylib";
+	size_t len = strlen(name);
+	
+	err = write(fd, (void *) &len, sizeof(size_t));
 	if(err < 0) {
 		close(fd);
-		perror("ping write() failed\n");
+		perror("header write() failed\n");
+		_exit(1);
+	}
+	
+	err = write(fd, name, len);
+	if(err < 0) {
+		close(fd);
+		perror("body write() failed\n");
 		_exit(1);
 	}
 	
