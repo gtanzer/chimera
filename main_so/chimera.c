@@ -7,61 +7,33 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <dlfcn.h>
 
-int a(int x, int y, int z, int w);
-int b(int x, int y, int z);
-int c(int x, int y);
-int d(int x);
+static void **cur_plt;
 
 void *patch_daemon(void *arg);
-
-// --- vtable -------------------------------------------------
-
-struct vtable {
-	int (*a)(int, int, int, int);
-	int (*b)(int, int, int);
-	int (*c)(int, int);
-	int (*d)(int);
-};
-
-struct vtable vt = { &a, &b, &c, &d };
-void **ovt = (void **) &vt;
-
-// --- base versions ------------------------------------------
-
-int a(int x, int y, int z, int w) {
-	printf("a ");
-	return vt.b(x,y,z) + vt.b(y,z,w);
-}
-
-int b(int x, int y, int z) {
-	printf("b ");
-	return vt.c(x,y) + vt.c(y,z);
-}
-
-int c(int x, int y) {
-	printf("c ");
-	return vt.d(x) + vt.d(y);
-}
-
-int d(int x) {
-	printf("d ");
-	return x * x;
-}
-
-// --- main ---------------------------------------------------
 
 int main(int argc, char **argv) {
 	(void) argc;
 	(void) argv;
 	
+	void *dll = dlopen("main.so", RTLD_LAZY | RTLD_GLOBAL);
+	if(dll == NULL) {
+		printf("%s\n", dlerror());
+		return -1;
+	}
+	
+	int (*nmain)(int, char **) = dlsym(dll, "main");
+	if(nmain == NULL) {
+		perror("dlsym() failed to find new main\n");
+		return -1;
+	}
+	
 	pthread_t tid;
 	int err = pthread_create(&tid, NULL, patch_daemon, NULL);
 	
-	while(1) {
-		printf("%d\n", vt.a(1,2,3,4));
-		sleep(1);
-	}
+	cur_plt = (void **) nmain;
+	nmain(argc, argv);
 	
 	return 0;
 }
@@ -142,37 +114,31 @@ void *patch_daemon(void *arg) {
 			perror("header read() failed\n");
 		}
 		
-		
-		
 		close(conn);
 	}
 	
 	close(fd);
 	unlink(UDS_NAME);
+	
+	return NULL;
 }
 
-#include <dlfcn.h>
-#define N_FUNCS 4
-
 int apply_patch(const char *name) {
-
-	void *dll = dlopen(name, RTLD_NOW | RTLD_GLOBAL);
+	void *dll = dlopen(name, RTLD_LAZY | RTLD_GLOBAL);
 	if(dll == NULL) {
 		printf("%s\n", dlerror());
 		return -1;
 	}
 	
-	void **nvt = dlsym(dll, "vt");
-	if(nvt == NULL) {
-		perror("dlsym() failed to find new vt\n");
+	int (*a)(int, char **) = dlsym(dll, "a");
+	if(a == NULL) {
+		perror("dlsym() failed to find new a\n");
 		return -1;
 	}
+	printf("%p\n", a);
 	
-	for(int i = 0; i < N_FUNCS; i++) {			// fill the old vtable without worrying about types
-		ovt[i] = nvt[i];
-	}
-	
-	ovt = nvt;
+	// replace old PLT maybe
+	// make sure globals are working properly
 	
 	// we could keep dll somewhere
 	// and dlclose() if no stack frame
