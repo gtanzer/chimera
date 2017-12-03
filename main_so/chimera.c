@@ -17,15 +17,15 @@ int main(int argc, char **argv) {
     (void) argc;
     (void) argv;
     
-    void *dll = dlopen("main.so", RTLD_LAZY | RTLD_GLOBAL);
+    void *dll = dlopen("./main.so", RTLD_NOW | RTLD_GLOBAL);
     if(dll == NULL) {
-        printf("%s\n", dlerror());
+        printf("dlopen() failed: %s\n", dlerror());
         return -1;
     }
     
     int (*nmain)(int, char **) = dlsym(dll, "main");
     if(nmain == NULL) {
-        perror("dlsym() failed to find new main\n");
+        printf("dlsym() failed to find new main: %s\n", dlerror());
         return -1;
     }
     
@@ -124,11 +124,13 @@ void *patch_daemon(void *arg) {
 }
 
 int apply_patch(const char *name) {
-    void *dll = dlopen(name, RTLD_LAZY | RTLD_GLOBAL);
+    void *dll = dlopen(name, RTLD_NOW | RTLD_GLOBAL);
     if(dll == NULL) {
         printf("%s\n", dlerror());
         return -1;
     }
+
+    // hopefully --filter will make this work automatically
     
     int (*a)(int, char **) = dlsym(dll, "a");
     if(a == NULL) {

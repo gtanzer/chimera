@@ -31,10 +31,12 @@ int main(int argc, char **argv) {
 	}
 	
 	char *name;
-	if(argc == 2)
-		name = "patch.so";
-	else
-		name = "patch.so";
+	if(argc == 2) {
+		name = argv[1];
+	}
+	else {
+		name = "./patch.so";
+	}
 	size_t len = strlen(name);
 	
 	err = write(fd, (void *) &len, sizeof(size_t));
