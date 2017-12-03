@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
 	
 	struct sockaddr_un server;
 	server.sun_family = AF_UNIX;
-	strcpy(server.sun_path, UDS_NAME); // don't make NAME too long
+	strcpy(server.sun_path, UDS_NAME); // don't make UDS_NAME too long
 	
 	int err = connect(fd, (struct sockaddr *) &server, sizeof(struct sockaddr_un));
 	if(err < 0) {

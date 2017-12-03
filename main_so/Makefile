@@ -1,8 +1,18 @@
-all:    
+all: chimera base patch
+clean:
+	@$(RM) chimera patcher *.so *.o
+
+chimera: 
 	gcc chimera.c -ldl -pthread -o chimera
 	gcc patcher.c -o patcher
-	gcc main.c -rdynamic -shared -fPIC -o main.so
-	ld -o main.so -shared main.so --filter chimera
-	gcc patch.c -rdynamic -shared -fPIC -o patch.so
-	ld -o patch.so -shared patch.so --filter chimera
+
+base:
+	gcc main.c -rdynamic -shared -fPIC -o main.o
+	ld -o main.so -shared main.o --filter chimera
+	@$(RM) *.o
+
+patch:
+	gcc patch.c -rdynamic -shared -fPIC -o patch.o
+	ld -o patch.so -shared patch.o --filter chimera
+	@$(RM) *.o
 	
