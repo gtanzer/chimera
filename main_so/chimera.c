@@ -12,6 +12,7 @@
 #include <link.h>
 #include <dlfcn.h>
 #include "plthook-elf.h"
+#include "imalloc.h"
 
 typedef struct version {
     void *dll;
@@ -24,6 +25,11 @@ static version_t base = {0};
 
 void *patch_daemon(void *arg);
 int main(int argc, char **argv) {
+
+    int err = imalloc_init();
+    if(err != 0) {
+        return -1;
+    }
     
     void *dll = dlopen("./main.so", RTLD_NOW | RTLD_GLOBAL);
     if(dll == NULL) {
@@ -32,7 +38,7 @@ int main(int argc, char **argv) {
     }
 
     struct link_map *lmap;
-    int err = dlinfo(dll, RTLD_DI_LINKMAP, &lmap);
+    err = dlinfo(dll, RTLD_DI_LINKMAP, &lmap);
     if(err == -1) {
         printf("dlinfo() failed to find main's link_map: %s\n", dlerror());
         return -1;
@@ -143,7 +149,6 @@ void *patch_daemon(void *arg) {
         cleanup:
             free(so_name);
             free(fn_name);
-
         }
         
         close(conn);

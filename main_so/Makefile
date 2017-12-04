@@ -4,7 +4,7 @@ all: chimera patcher main.so patch.so patch2.so
 clean:
 	@$(RM) chimera patcher *.so *.o
 
-chimera: chimera.c plthook-elf.h
+chimera: chimera.c plthook-elf.h imalloc.h
 	$(CC) chimera.c -ldl -pthread -o chimera
 
 patcher: patcher.c
