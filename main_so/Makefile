@@ -1,16 +1,18 @@
+CC=gcc
+
 all: chimera patcher main.so patch.so
 clean:
 	@$(RM) chimera patcher *.so *.o
 
-chimera: 
-	gcc chimera.c -ldl -pthread -o chimera
+chimera: chimera.c
+	$(CC) chimera.c -ldl -pthread -o chimera
 
-patcher:
-	gcc patcher.c -o patcher
+patcher: patcher.c
+	$(CC) patcher.c -o patcher
 
-main.so:
-	gcc main.c -rdynamic -shared -fPIC -Xlinker "-soname=chimera" -Xlinker "--filter" -Xlinker "chimera" -o main.so
+main.so: main.c
+	$(CC) main.c -rdynamic -shared -fPIC -o main.so
 
-patch.so:
-	gcc patch.c -rdynamic -shared -fPIC -Xlinker "-soname=chimera" -Xlinker "--filter" -Xlinker "chimera" -o patch.so
-	
+patch.so: patch.c
+	$(CC) patch.c -rdynamic -shared -fPIC -o patch.so
+	objcopy --weaken patch.so
