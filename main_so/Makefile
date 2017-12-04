@@ -9,10 +9,8 @@ patcher:
 	gcc patcher.c -o patcher
 
 main.so:
-	gcc main.c -rdynamic -shared -fPIC -o main.so
-	#ld -o main.so -shared main.o --filter chimera
+	gcc main.c -rdynamic -shared -fPIC -Xlinker "-soname=chimera" -Xlinker "--filter" -Xlinker "chimera" -o main.so
 
 patch.so:
-	gcc patch.c -rdynamic -shared -fPIC -o patch.so
-	#ld -o patch.so -shared patch.o --filter chimera
+	gcc patch.c -rdynamic -shared -fPIC -Xlinker "-soname=chimera" -Xlinker "--filter" -Xlinker "chimera" -o patch.so
 	

@@ -132,12 +132,12 @@ int apply_patch(const char *name) {
 
     // hopefully --filter will make this work automatically
     
-    int (*a)(int, char **) = dlsym(dll, "a");
+    /*int (*a)(int, char **) = dlsym(dll, "a");
     if(a == NULL) {
         perror("dlsym() failed to find new a\n");
         return -1;
     }
-    printf("%p\n", a);
+    printf("%p\n", a);*/
     
     // replace old PLT maybe
     // make sure globals are working properly
