@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -7,9 +9,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <link.h>
 #include <dlfcn.h>
+#include "plthook-elf.h"
 
-static void *cur_dll;
+static void *main_dll;
 
 void *patch_daemon(void *arg);
 
@@ -22,13 +26,14 @@ int main(int argc, char **argv) {
         printf("dlopen() failed: %s\n", dlerror());
         return -1;
     }
-    cur_dll = dll;
     
     int (*nmain)(int, char **) = dlsym(dll, "main");
     if(nmain == NULL) {
         printf("dlsym() failed to find new main: %s\n", dlerror());
         return -1;
     }
+
+    main_dll = dll;
     
     pthread_t tid;
     int err = pthread_create(&tid, NULL, patch_daemon, NULL);
@@ -134,31 +139,32 @@ int apply_patch(const char *so_name, const char *fn_name) {
         printf("%s\n", dlerror());
         return -1;
     }
-
-    printf("%s\n", fn_name);
     
     void *fn = dlsym(dll, fn_name);
     if(fn == NULL) {
         printf("dlsym() failed to find new fn: %s\n", dlerror());
         return -1;
     }
-    printf("%p\n", fn);
 
-    /*void *plt = dlsym(dll, "_GLOBAL_OFFSET_TABLE_");
-    if(plt == NULL) {
-        printf("dlsym() failed to find new plt: %s\n", dlerror());
+    struct link_map *lmap;
+    int err = dlinfo(main_dll, RTLD_DI_LINKMAP, &lmap);
+    if(err == -1) {
+        printf("dlinfo() failed to find main's link_map: %s\n", dlerror());
         return -1;
     }
-    printf("%p\n", plt);*/
+    
+    plthook_t plthook;
+    err = plthook_open_real(&plthook, lmap);
+    if(err != 0) {
+        printf("plthook_open_real() failed with error: %s\n", plthook_error());
+        return -1;
+    }
 
-    cur_dll = dll;
-    
-    // replace old PLT maybe
-    // make sure globals are working properly
-    
-    // we could keep dll somewhere
-    // and dlclose() if no stack frame
-    // uses that version
+    err = plthook_replace(&plthook, fn_name, (void *)fn, NULL);
+    if(err != 0) {
+        printf("plthook_replace() failed with error: %s\n", plthook_error());
+        return -1;
+    }
     
     return 0;
 }

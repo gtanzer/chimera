@@ -4,7 +4,7 @@ all: chimera patcher main.so patch.so
 clean:
 	@$(RM) chimera patcher *.so *.o
 
-chimera: chimera.c
+chimera: chimera.c plthook-elf.h
 	$(CC) chimera.c -ldl -pthread -o chimera
 
 patcher: patcher.c
@@ -12,6 +12,7 @@ patcher: patcher.c
 
 main.so: main.c
 	$(CC) main.c -rdynamic -shared -fPIC -o main.so
+	objcopy --weaken main.so
 
 patch.so: patch.c
 	$(CC) patch.c -rdynamic -shared -fPIC -o patch.so
