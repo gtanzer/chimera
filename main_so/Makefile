@@ -11,9 +11,9 @@ patcher: patcher.c
 	$(CC) patcher.c -o patcher
 
 main.so: main.c
-	$(CC) main.c -rdynamic -shared -fPIC -o main.so
+	$(CC) main.c -rdynamic -shared -fpic -o main.so
 	objcopy --weaken main.so
 
 patch.so: patch.c
-	$(CC) patch.c -rdynamic -shared -fPIC -o patch.so
+	$(CC) patch.c -rdynamic -shared -fpic -o patch.so
 	objcopy --weaken patch.so

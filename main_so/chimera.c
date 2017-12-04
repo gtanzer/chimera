@@ -13,30 +13,52 @@
 #include <dlfcn.h>
 #include "plthook-elf.h"
 
-static void *main_dll;
+typedef struct version {
+    void *dll;
+    struct link_map *lmap;
+    plthook_t plthook;
+    struct version *next;
+} version_t;
+
+static version_t base = {0};
 
 void *patch_daemon(void *arg);
-
 int main(int argc, char **argv) {
-    (void) argc;
-    (void) argv;
     
     void *dll = dlopen("./main.so", RTLD_NOW | RTLD_GLOBAL);
     if(dll == NULL) {
         printf("dlopen() failed: %s\n", dlerror());
         return -1;
     }
+
+    struct link_map *lmap;
+    int err = dlinfo(dll, RTLD_DI_LINKMAP, &lmap);
+    if(err == -1) {
+        printf("dlinfo() failed to find main's link_map: %s\n", dlerror());
+        return -1;
+    }
+
+    plthook_t plthook;
+    err = plthook_open_real(&plthook, lmap);
+    if(err != 0) {
+        printf("plthook_open_real() failed with error: %s\n", plthook_error());
+        return -1;
+    }
+
+    base = (version_t) {.dll = dll, .lmap = lmap, .plthook = plthook, .next = NULL};
     
     int (*nmain)(int, char **) = dlsym(dll, "main");
     if(nmain == NULL) {
         printf("dlsym() failed to find new main: %s\n", dlerror());
         return -1;
     }
-
-    main_dll = dll;
     
     pthread_t tid;
-    int err = pthread_create(&tid, NULL, patch_daemon, NULL);
+    err = pthread_create(&tid, NULL, patch_daemon, NULL);
+    if(err != 0) {
+        perror("pthread create() failed");
+        return -1;
+    }
     
     nmain(argc, argv);
     
@@ -139,6 +161,20 @@ int apply_patch(const char *so_name, const char *fn_name) {
         printf("%s\n", dlerror());
         return -1;
     }
+
+    struct link_map *lmap;
+    int err = dlinfo(dll, RTLD_DI_LINKMAP, &lmap);
+    if(err == -1) {
+        printf("dlinfo() failed to find main's link_map: %s\n", dlerror());
+        return -1;
+    }
+
+    plthook_t plthook;
+    err = plthook_open_real(&plthook, lmap);
+    if(err != 0) {
+        printf("plthook_open_real() failed with error: %s\n", plthook_error());
+        return -1;
+    }
     
     void *fn = dlsym(dll, fn_name);
     if(fn == NULL) {
@@ -146,24 +182,35 @@ int apply_patch(const char *so_name, const char *fn_name) {
         return -1;
     }
 
-    struct link_map *lmap;
-    int err = dlinfo(main_dll, RTLD_DI_LINKMAP, &lmap);
-    if(err == -1) {
-        printf("dlinfo() failed to find main's link_map: %s\n", dlerror());
-        return -1;
-    }
+    version_t *node = &base;
+    version_t *insert = &base;
     
-    plthook_t plthook;
-    err = plthook_open_real(&plthook, lmap);
-    if(err != 0) {
-        printf("plthook_open_real() failed with error: %s\n", plthook_error());
-        return -1;
+    while(node != NULL) {
+        err = plthook_replace(&node->plthook, fn_name, (void *)fn, NULL);
+        if(err != 0) {
+            printf("plthook_replace() failed with error: %s\n", plthook_error());
+            return -1;
+        }
+
+        if(dll == node->dll) {
+            insert = NULL;
+        }
+        if(insert != NULL) {
+            insert = node;
+        }
+        node = node->next;
     }
 
-    err = plthook_replace(&plthook, fn_name, (void *)fn, NULL);
-    if(err != 0) {
-        printf("plthook_replace() failed with error: %s\n", plthook_error());
-        return -1;
+    if(insert != NULL) {
+        node = malloc(sizeof(version_t));
+        *node = (version_t) {.dll = dll, .lmap = lmap, .plthook = plthook, .next = NULL};
+        insert->next = node;
+
+        err = plthook_replace(&node->plthook, fn_name, (void *)fn, NULL);
+        if(err != 0) {
+            printf("plthook_replace() failed with error: %s\n", plthook_error());
+            return -1;
+        }
     }
     
     return 0;
