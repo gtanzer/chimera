@@ -52,29 +52,10 @@ int main(int argc, char **argv) {
 	printf("argc: %d\n", argc);
 	printf("argv[0]: %s\n", argv[0]);
 
-	double a = get_time();
-
-	size_t j = 0;
-	size_t *ptr = calloc(1 << 27, 1);
-	for(size_t i = 0; i < (1 << 24); i++) {
-		for(size_t j = 0; j < 512; j++) {
-			ptr[i] = (j * i) ^ ptr[i];
-		}
-	} 
-	for(size_t i = 0; i < (1 << 24); i++) {
-		j += ptr[i] % 492366587;
-	}
-
-	double b = get_time();
-
-	printf("result: %zu, time: %f\n", j, b-a);
-
-	free(ptr);
-
-	/*while(1) {
+	while(1) {
 		printf("%d\n", a(1,2,3,4));
 		sleep(1);
-	}*/
+	}
 	
 	return 0;
 }
