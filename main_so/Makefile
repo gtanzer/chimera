@@ -5,8 +5,8 @@ all: chimera patcher main.so patch.so patch2.so
 clean:
 	@$(RM) chimera patcher *.so *.o
 
-chimera: chimera.c plthook-elf.h imalloc.h
-	$(CC) $(CFLAGS)  chimera.c -U_FORTIFY_SOURCE -ldl -pthread -o chimera
+chimera: chimera.c plthook-elf.h
+	$(CC) $(CFLAGS) chimera.c -U_FORTIFY_SOURCE -ldl -pthread -o chimera
 
 patcher: patcher.c
 	$(CC) patcher.c -o patcher
