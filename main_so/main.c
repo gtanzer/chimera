@@ -1,18 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
-
-#include <sys/time.h>
-#include <sys/resource.h>
-
-double get_time()
-{
-    struct timeval t;
-    struct timezone tzp;
-    gettimeofday(&t, &tzp);
-    return t.tv_sec + t.tv_usec*1e-6;
-}
 
 int a(int x, int y, int z, int w);
 int b(int x, int y, int z);

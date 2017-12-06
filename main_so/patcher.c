@@ -11,6 +11,21 @@
 
 int main(int argc, char **argv) {
 	
+	char *so_name, *fn_name;
+
+	so_name = "./patch.so";
+	if(argc == 3) {
+		so_name = argv[1];
+		fn_name = argv[2];
+	}
+	else if(argc == 2) {
+		fn_name = argv[1];
+	}
+	else {
+		fprintf(stderr, "Usage: patcher [patch_name] function_name\n");
+		_exit(1);
+	}
+
 	// --- send patch -----------------------------------------
 	
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -30,20 +45,6 @@ int main(int argc, char **argv) {
 		_exit(1);
 	}
 	
-	char *so_name, *fn_name;
-
-	so_name = "./patch.so";
-	if(argc == 3) {
-		so_name = argv[1];
-		fn_name = argv[2];
-	}
-	else if(argc == 2) {
-		fn_name = argv[1];
-	}
-	else {
-		printf("Usage: patcher [patch_name] function_name\n");
-		_exit(1);
-	}
 	size_t lens[2] = { strlen(so_name)+1, strlen(fn_name)+1 };
 	
 	err = write(fd, (void *) &lens[0], 2*sizeof(size_t));

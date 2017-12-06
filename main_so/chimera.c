@@ -27,24 +27,29 @@ void *patch_daemon(void *arg);
 
 ATTRIBUTE_NO_SANITIZE_ADDRESS
 int main(int argc, char **argv) {
+
+    if(argc < 2) {
+        fprintf(stderr, "Usage: chimera progname.so [args]\n");
+        _exit(1);
+    }
     
-    void *dll = dlopen("./main.so", RTLD_NOW | RTLD_GLOBAL);
+    void *dll = dlopen(argv[1], RTLD_NOW | RTLD_GLOBAL);
     if(dll == NULL) {
-        printf("dlopen() failed: %s\n", dlerror());
+        fprintf(stderr, "dlopen() failed: %s\n", dlerror());
         return -1;
     }
 
     struct link_map *lmap;
     int err = dlinfo(dll, RTLD_DI_LINKMAP, &lmap);
     if(err == -1) {
-        printf("dlinfo() failed to find main's link_map: %s\n", dlerror());
+        fprintf(stderr, "dlinfo() failed to find main's link_map: %s\n", dlerror());
         return -1;
     }
 
     plthook_t plthook;
     err = plthook_open_real(&plthook, lmap);
     if(err != 0) {
-        printf("plthook_open_real() failed with error: %s\n", plthook_error());
+        fprintf(stderr, "plthook_open_real() failed with error: %s\n", plthook_error());
         return -1;
     }
 
@@ -52,7 +57,7 @@ int main(int argc, char **argv) {
     
     int (*nmain)(int, char **) = dlsym(dll, "main");
     if(nmain == NULL) {
-        printf("dlsym() failed to find new main: %s\n", dlerror());
+        fprintf(stderr, "dlsym() failed to find new main: %s\n", dlerror());
         return -1;
     }
     
@@ -63,7 +68,7 @@ int main(int argc, char **argv) {
         return -1;
     }
     
-    nmain(argc, argv);
+    nmain(argc-1, argv+1);
     
     return 0;
 }
@@ -140,7 +145,7 @@ void *patch_daemon(void *arg) {
         
             err = apply_patch(so_name, fn_name);
             if(err < 0) {
-                printf("apply_patch() failed\n");
+                fprintf(stderr, "apply_patch() failed\n");
                 goto cleanup;
             }
             
@@ -169,20 +174,20 @@ int apply_patch(const char *so_name, const char *fn_name) {
     struct link_map *lmap;
     int err = dlinfo(dll, RTLD_DI_LINKMAP, &lmap);
     if(err == -1) {
-        printf("dlinfo() failed to find main's link_map: %s\n", dlerror());
+        fprintf(stderr, "dlinfo() failed to find main's link_map: %s\n", dlerror());
         return -1;
     }
 
     plthook_t plthook;
     err = plthook_open_real(&plthook, lmap);
     if(err != 0) {
-        printf("plthook_open_real() failed with error: %s\n", plthook_error());
+        fprintf(stderr, "plthook_open_real() failed with error: %s\n", plthook_error());
         return -1;
     }
     
     void *fn = dlsym(dll, fn_name);
     if(fn == NULL) {
-        printf("dlsym() failed to find new fn: %s\n", dlerror());
+        fprintf(stderr, "dlsym() failed to find new fn: %s\n", dlerror());
         return -1;
     }
 
@@ -192,7 +197,7 @@ int apply_patch(const char *so_name, const char *fn_name) {
     while(node != NULL) {
         err = plthook_replace(&node->plthook, fn_name, (void *)fn, NULL);
         if(err != 0) {
-            printf("plthook_replace() failed with error: %s\n", plthook_error());
+            fprintf(stderr, "plthook_replace() failed with error: %s\n", plthook_error());
             return -1;
         }
 
@@ -212,7 +217,7 @@ int apply_patch(const char *so_name, const char *fn_name) {
 
         err = plthook_replace(&node->plthook, fn_name, (void *)fn, NULL);
         if(err != 0) {
-            printf("plthook_replace() failed with error: %s\n", plthook_error());
+            fprintf(stderr, "plthook_replace() failed with error: %s\n", plthook_error());
             return -1;
         }
     }
