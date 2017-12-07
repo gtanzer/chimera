@@ -138,6 +138,7 @@ void web(int fd, int hit)
 	while (	(ret = read(file_fd, buffer, BUFSIZE/2)) > 0 ) {
 		err = write(fd,buffer,ret);
 	}
+
 #ifdef LINUX
 	sleep(1);
 #endif
@@ -178,8 +179,8 @@ int main(int argc, char **argv)
 
 	(void)signal(SIGCLD, SIG_IGN); 
 	(void)signal(SIGHUP, SIG_IGN); 
-	for(i=0;i<32;i++)
-		(void)close(i);	
+	/*for(i=0;i<32;i++)
+		(void)close(i);	*/
 	(void)setpgrp();	
 
 	mlog(LOG,"http server starting",argv[1],getpid());

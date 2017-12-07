@@ -26,6 +26,11 @@ static version_t base = {0};
 void *patch_daemon(void *arg);
 
 ATTRIBUTE_NO_SANITIZE_ADDRESS
+const char *__asan_default_options() {
+  return "detect_leaks=0";
+}
+
+ATTRIBUTE_NO_SANITIZE_ADDRESS
 int main(int argc, char **argv) {
 
     if(argc < 2) {
