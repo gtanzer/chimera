@@ -1,5 +1,7 @@
 # chimera
 
+See Chimera.pdf for the paper.
+
 // --- fnptrs -----------------------------------------
 
 make
